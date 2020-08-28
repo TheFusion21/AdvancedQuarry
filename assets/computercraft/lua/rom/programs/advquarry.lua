@@ -6,6 +6,7 @@ local position =
     y = 0,
     z = 0,
 }
+local facingDir = 0
 
 local stopPosition = 
 {
@@ -13,12 +14,12 @@ local stopPosition =
     y = 0,
     z = 0,
 }
+local stopFacingDir = 0
 
 local size = 64
 
 local MAXTRIES = 50
 
-local facingDir = 0
 
 local setS = false
 local tArgs = {...}
@@ -67,6 +68,7 @@ function refuelIfNeeded()
         end
     end
 end
+
 function adjPosition()
     if facingDir == 0 then
         position.z = position.z + 1
@@ -148,6 +150,15 @@ function rotLeft()
     turtle.turnLeft()
 end
 
+function isInventoryFull()
+    for i = 1, 16 do
+        if turtle.getItemCount(i) == 0 then
+			return false
+		end
+    end
+    return true
+end
+
 function dropOff()
     local dif = math.abs(position.y)
     for i = 1,dif do
@@ -172,6 +183,72 @@ function dropOff()
         down()
     end
 end
+
+function clearInventory()
+    if isInventoryFull() then
+        -- drop stuff and try to stack and check again
+        dropTrash()
+        stack()
+        if isInventoryFull() then
+            log("inventory full")
+            log("stopping at ")
+            stopPosition.x = position.x
+            stopPosition.y = position.y
+            stopPosition.z = position.z
+            stopFacingDir = facingDir
+            -- move back to chest
+            if back then
+                rotRight()
+            else
+                rotLeft()
+            end
+            for i = 1,stopPosition.x do
+                forward()
+            end
+            rotLeft()
+            for i = 1,stopPosition.z do
+                forward()
+            end
+            dif = math.abs(stopPosition.y)
+            for i = 1,dif do
+                up()
+            end
+            -- drop of into chest
+            for i = 1, 16 do
+                turtle.select(i)
+                item = turtle.getItemDetail()
+                if item then
+                    if item.name ~= "minecraft:coal" then
+                        turtle.drop()
+                    end
+                end
+            end
+            -- go back to postion where we stopped at
+            log("going back to [" .. stopPosition.x .. ", " .. stopPosition.y .. ", " .. stopPosition.z .. "]")
+            rotLeft()
+            rotLeft()
+
+            for i = 1,stopPosition.z do
+                forward()
+            end
+
+            rotRight()
+
+            for i = 1,stopPosition.x do
+                forward()
+            end
+
+            while facingDir ~= stopFacingDir do
+                rotRight()
+            end
+
+            dif = math.abs(stopPosition.y)
+            for i = 1,dif do
+                down()
+            end
+        end
+    end
+end
 local depth =
 {
     x = 0,
@@ -179,6 +256,26 @@ local depth =
 }
 local back = false
 
+function stack()
+    log("trying to stack items")
+    for i = 1, 16 do
+        item = turtle.getItemDetail(i)
+
+        if item then
+            for j = i, 16 do
+                turtle.select(j)
+                item2 = turtle.getItemDetail()
+
+                if item2 then
+                    if item.name == item.name then
+                        turtle.transferTo(i)
+                    end
+                end
+            end
+        end
+    end
+    turtle.select(1)
+end
 function dropTrash()
     local useless = {
         "undergroundbiomes:sedimentary_stone",
@@ -191,7 +288,10 @@ function dropTrash()
         "minecraft:sandstone",
         "minecraft:cobblestone",
         "minecraft:gravel",
-        "minecraft:flint"
+        "minecraft:flint",
+        "minecraft:rotten_flesh",
+        "thaumcraft:brain",
+        "undergroundbiomes:fossil_piece"
     }
     for i = 1, 16 do
         details = turtle.getItemDetail(i)
@@ -208,6 +308,8 @@ function dropTrash()
 end
 
 while true do
+    -- go to chest if inventory is full
+    clearInventory()
     if forward() then
         depth.z = depth.z + 1
     end
